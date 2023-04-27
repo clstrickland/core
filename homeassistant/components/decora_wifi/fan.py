@@ -1,16 +1,9 @@
 """Interfaces with the myLeviton API for Decora Smart WiFi products."""
-
 from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.light import (
-    ATTR_BRIGHTNESS,
-    ATTR_TRANSITION,
-    ColorMode,
-    LightEntity,
-    LightEntityFeature,
-)
+from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
@@ -27,38 +20,29 @@ def setup_platform(
     """Set up the Decora WiFi platform."""
 
     add_entities(
-        DecoraWifiLight(switch)
+        DecoraWifiFan(switch)
         for switch in hass.data[DOMAIN]["Switches"]
-        if switch.customType != "ceiling-fan"
+        if switch.customType == "ceiling-fan"
     )
 
 
-class DecoraWifiLight(LightEntity):
+# Since Leviton only makes one wifi fan switch, and since the api is undocumented, we can hardcode some values, like the speed count.
+class DecoraWifiFan(FanEntity):
     """Representation of a Decora WiFi switch."""
 
     def __init__(self, switch) -> None:
         """Initialize the switch."""
         self._switch = switch
         self._attr_unique_id = switch.serial
+        self._attr_speed_count = 4
+        self._attr_supported_features = FanEntityFeature.SET_SPEED
 
     @property
-    def color_mode(self) -> str:
-        """Return the color mode of the light."""
-        if self._switch.canSetLevel:
-            return ColorMode.BRIGHTNESS
-        return ColorMode.ONOFF
-
-    @property
-    def supported_color_modes(self) -> set[str] | None:
-        """Flag supported color modes."""
-        return {self.color_mode}
-
-    @property
-    def supported_features(self) -> LightEntityFeature:
-        """Return supported features."""
-        if self._switch.canSetLevel:
-            return LightEntityFeature.TRANSITION
-        return LightEntityFeature(0)
+    def percentage(self) -> int | None:
+        """Return the current speed as a percentage."""
+        return int(
+            self._switch.brightness
+        )  # Leviton calls the fan speed brightness in their api.
 
     @property
     def name(self) -> str | None:
@@ -71,34 +55,32 @@ class DecoraWifiLight(LightEntity):
         return self._switch.serial
 
     @property
-    def brightness(self) -> int | None:
-        """Return the brightness of the dimmer switch."""
-        return int(self._switch.brightness * 255 / 100)
-
-    @property
     def is_on(self) -> bool | None:
         """Return true if switch is on."""
         return self._switch.power == "ON"
 
-    def turn_on(self, **kwargs: Any) -> None:
+    def turn_on(
+        self,
+        percentage: int | None = None,
+        preset_mode: str | None = None,
+        **kwargs: Any,
+    ) -> None:
         """Instruct the switch to turn on & adjust brightness."""
         attribs: dict[str, Any] = {"power": "ON"}
 
-        if ATTR_BRIGHTNESS in kwargs:
+        if percentage is not None:
             min_level = self._switch.data.get("minLevel", 0)
-            max_level = self._switch.data.get("maxLevel", 100)
-            brightness = int(kwargs[ATTR_BRIGHTNESS] * max_level / 255)
+            # max_level = self._switch.data.get("maxLevel", 100)
+            brightness = int(percentage)
             brightness = max(brightness, min_level)
             attribs["brightness"] = brightness
 
-        if ATTR_TRANSITION in kwargs:
-            transition = int(kwargs[ATTR_TRANSITION])
-            attribs["fadeOnTime"] = attribs["fadeOffTime"] = transition
-
         try:
             self._switch.update_attributes(attribs)
+            return
         except ValueError:
             LOGGER.error("Failed to turn on myLeviton switch")
+            return
 
     def turn_off(self, **kwargs: Any) -> None:
         """Instruct the switch to turn off."""
@@ -114,3 +96,11 @@ class DecoraWifiLight(LightEntity):
             self._switch.refresh()
         except ValueError:
             LOGGER.error("Failed to update myLeviton switch data")
+
+    def set_percentage(self, percentage: int) -> None:
+        """Set the speed of the fan, as a percentage."""
+        attribs = {"brightness": percentage}
+        try:
+            self._switch.update_attributes(attribs)
+        except ValueError:
+            LOGGER.error("Failed to turn off myLeviton switch")

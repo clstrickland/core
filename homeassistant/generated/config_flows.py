@@ -84,6 +84,7 @@ FLOWS = {
         "crownstone",
         "daikin",
         "deconz",
+        "decora_wifi",
         "deluge",
         "denonavr",
         "devolo_home_control",
