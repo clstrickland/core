@@ -30,6 +30,33 @@ class SongpalDataUpdateCoordinator(DataUpdateCoordinator[SongpalData]):
             config_entry=entry,
         )
 
+    async def _get_sound_modes(self) -> tuple[dict, str | None]:
+        """Fetch current sound modes and active sound mode.
+
+        This logic is extracted so it can be reused when sound mode state changes
+        (e.g., when switching inputs, which resets the sound mode to the saved value for that input).
+        """
+        soundfields = await self.device.get_soundfield()
+
+        if isinstance(soundfields, Setting):
+            soundfields = [soundfields]
+
+        sound_modes = {}
+        active_sound_mode = None
+        for soundfield in soundfields:
+            cur = soundfield.currentValue
+            for opt in soundfield.candidate:
+                if not opt.isAvailable:
+                    continue
+                if opt.value == cur:
+                    active_sound_mode = opt.value
+                sound_modes[opt.value] = opt
+
+        _LOGGER.debug("Got sound modes: %s", sound_modes)
+        _LOGGER.debug("Active sound mode: %s", active_sound_mode)
+
+        return sound_modes, active_sound_mode
+
     async def _async_update_data(self):
         """Fetch all data for the device (polling)."""
         try:
@@ -75,24 +102,8 @@ class SongpalDataUpdateCoordinator(DataUpdateCoordinator[SongpalData]):
                 )
             interface_info = await self.device.get_interface_information()
             model_name = interface_info.modelName
-            soundfields = await self.device.get_soundfield()
 
-            if isinstance(soundfields, Setting):
-                soundfields = [soundfields]
-
-            sound_modes = {}
-            active_sound_mode = None
-            for soundfield in soundfields:
-                cur = soundfield.currentValue
-                for opt in soundfield.candidate:
-                    if not opt.isAvailable:
-                        continue
-                    if opt.value == cur:
-                        active_sound_mode = opt.value
-                    sound_modes[opt.value] = opt
-
-            _LOGGER.debug("Got sound modes: %s", sound_modes)
-            _LOGGER.debug("Active sound mode: %s", active_sound_mode)
+            sound_modes, active_sound_mode = await self._get_sound_modes()
 
         except SongpalException as err:
             raise UpdateFailed(

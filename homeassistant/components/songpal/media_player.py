@@ -333,6 +333,15 @@ class SongpalZoneEntity(
             if result:
                 data = deepcopy(self.coordinator.data)
                 data.zones[self._zone_uri].source = target_source.uri
+
+                # Refresh sound mode since switching inputs resets it to saved value
+                (
+                    sound_modes,
+                    active_sound_mode,
+                ) = await self.coordinator._get_sound_modes()
+                data.sound_modes = sound_modes
+                data.active_sound_mode = active_sound_mode
+
                 self.coordinator.async_set_updated_data(data)
 
     async def async_select_sound_mode(self, sound_mode: str) -> None:
