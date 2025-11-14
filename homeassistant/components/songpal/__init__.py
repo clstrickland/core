@@ -15,6 +15,7 @@ from songpal import (
     VolumeChange,
     ZoneActivatedChange,
 )
+from songpal.notification import ChangeNotification
 import voluptuous as vol
 
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
@@ -70,20 +71,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # These functions will be called by the songpal library on a push update.
     # They update the coordinator's data directly.
 
-    async def _handle_volume_change(change: VolumeChange):
+    async def _handle_volume_change(change: ChangeNotification) -> None:
         """Handle a volume change notification."""
         if not coordinator or not coordinator.data:
+            return
+        if not isinstance(change, VolumeChange):
+            _LOGGER.warning(
+                "Received wrong change type in volume change handler: %s", change
+            )
             return
         _LOGGER.debug("Handling volume change: %s", change)
         data: SongpalData = deepcopy(coordinator.data)
         if (zone := data.zones.get(change.output)) and zone.volume_info:
             zone.volume_info.volume = change.volume
-            zone.volume_info.mute = change.mute
+            zone.volume_info.mute = "on" if change.mute else "off"
             coordinator.async_set_updated_data(data)
 
-    async def _handle_zone_activated_change(change: ZoneActivatedChange):
+    async def _handle_zone_activated_change(change: ChangeNotification) -> None:
         """Handle a zone activated notification."""
         if not coordinator.data:
+            return
+        if not isinstance(change, ZoneActivatedChange):
+            _LOGGER.warning(
+                "Received wrong change type in zone activated handler: %s", change
+            )
             return
         _LOGGER.debug("Handling zone activated change: %s", change)
         data: SongpalData = deepcopy(coordinator.data)
@@ -91,9 +102,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             zone.active = change.active
             coordinator.async_set_updated_data(data)
 
-    async def _handle_source_change(change: ContentChange):
+    async def _handle_source_change(change: ChangeNotification) -> None:
         """Handle a source change notification."""
         if not coordinator.data:
+            return
+        if not isinstance(change, ContentChange):
+            _LOGGER.warning(
+                "Received wrong change type in source change handler: %s", change
+            )
             return
         _LOGGER.debug("Handling source change: %s", change)
         data: SongpalData = deepcopy(coordinator.data)
@@ -126,8 +142,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 await asyncio.sleep(delay)
                 delay = min(2 * delay, 300)  # Exponential backoff
 
-    async def _handle_connect_change(change: ConnectChange):
+    async def _handle_connect_change(change: ChangeNotification) -> None:
         """Handle a disconnect notification."""
+        if not isinstance(change, ConnectChange):
+            _LOGGER.warning(
+                "Received wrong change type in connect change handler: %s", change
+            )
+            return
         nonlocal _reconnect_in_progress
         if _reconnect_in_progress:
             _LOGGER.debug("Reconnect already in progress, ignoring disconnect event")
@@ -137,9 +158,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _reconnect_in_progress = True
         hass.create_task(_reconnect_task())
 
-    async def _setting_changed(change: SettingChange):
+    async def _setting_changed(change: ChangeNotification) -> None:
         """Handle a setting change notification."""
         if not coordinator.data:
+            return
+        if not isinstance(change, SettingChange):
+            _LOGGER.warning(
+                "Received wrong change type in setting change handler: %s", change
+            )
             return
         _LOGGER.debug("Setting changed: %s", change)
         if change.target == "soundField":

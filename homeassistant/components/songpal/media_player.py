@@ -79,6 +79,18 @@ class SongpalZoneEntity(
         self._zone_uri = zone_uri
         self._attr_name = self._zone_data.title
         self._attr_unique_id = f"{self.coordinator.data.model}-{self._zone_data.id}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, self._attr_unique_id)},
+            name=self._zone_data.title,
+            manufacturer="Sony",
+            model=f"Zone ({self.coordinator.data.model})",
+            via_device=(DOMAIN, self.coordinator.data.model),
+        )
+        # self.entity_id = generate_entity_id(
+        #     "media_player.{}",
+        #     f"{self.coordinator.data.model}{f'-zone-{self._zone_data.id}' if self._zone_data.id != '1' else ''}",
+        #     hass=coordinator.hass,
+        # )
 
         self._attr_supported_features = (
             MediaPlayerEntityFeature.TURN_ON
@@ -98,26 +110,29 @@ class SongpalZoneEntity(
         """Helper to get the data for this specific zone."""
         return self.coordinator.data.zones[self._zone_uri]
 
-    @property
-    def name(self) -> str:
-        """Return the name of the zone."""
-        return self._zone_data.title
+    # @property
+    # def name(self) -> str:
+    #     """Return the name of the zone."""
+    #     return self._zone_data.title
+    #     # return None
 
-    @property
-    def unique_id(self) -> str:
-        """Return a unique ID for the zone."""
-        return f"{self.coordinator.data.model}-{self._zone_data.id}"
+    # @property
+    # def unique_id(self) -> str:
+    #     """Return a unique ID for the zone."""
+    #     return f"{self.coordinator.data.model}-{self._zone_data.id}"
 
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return the device info for the zone to create a unique device."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, self.unique_id)},
-            name=self.name,
-            manufacturer="Sony",
-            model=f"Zone ({self.coordinator.data.model})",
-            via_device=(DOMAIN, self.coordinator.data.model),
-        )
+    # @property
+    # def device_info(self) -> DeviceInfo:
+    #     """Return the device info for the zone to create a unique device."""
+    #     return DeviceInfo(
+    #         identifiers={(DOMAIN, self.unique_id)},
+    #         # FIX: Give the DEVICE a clear name (e.g., "Main Zone").
+    #         name=self._zone_data.title,
+    #         manufacturer="Sony",
+    #         model=f"Zone ({self.coordinator.data.model})",
+    #         # This links to the parent device created by the sensor.
+    #         via_device=(DOMAIN, self.coordinator.data.model),
+    #     )
 
     @property
     def state(self) -> MediaPlayerState | None:
