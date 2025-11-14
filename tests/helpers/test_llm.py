@@ -10,7 +10,7 @@ import voluptuous as vol
 from homeassistant.components import calendar, todo
 from homeassistant.components.homeassistant.exposed_entities import async_expose_entity
 from homeassistant.components.intent import async_register_timer_handler
-from homeassistant.components.script.config import ScriptConfig
+from homeassistant.components.script import ScriptConfig
 from homeassistant.core import Context, HomeAssistant, State, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import (
@@ -1131,6 +1131,19 @@ async def test_selector_serializer(
             "metadata": {"type": "object", "additionalProperties": True},
         },
         "required": ["media_content_id", "media_content_type"],
+    }
+    assert selector_serializer(selector.MediaSelector({"multiple": True})) == {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {
+                "entity_id": {"type": "string"},
+                "media_content_id": {"type": "string"},
+                "media_content_type": {"type": "string"},
+                "metadata": {"type": "object", "additionalProperties": True},
+            },
+            "required": ["media_content_id", "media_content_type"],
+        },
     }
     assert selector_serializer(selector.NumberSelector({"mode": "box"})) == {
         "type": "number"
